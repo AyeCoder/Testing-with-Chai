@@ -1,4 +1,6 @@
-pragma solidity 0.8.0;
+pragma solidity ^0.8.0;
+
+import './Campaign.sol';
 
 contract DAO{
 
@@ -10,6 +12,9 @@ contract DAO{
         string proposalName;
         bytes hash;
         address manager;
+        uint256 maximumTarget;
+        uint256 minimumTarget;
+        uint24 duration;
         uint8 isDeployed;
     }
     Proposal[] public proposals;
@@ -31,15 +36,30 @@ contract DAO{
         require( isOwner[msg.sender] == 1 , "DAO: onlyOnwer function");
         _;
     }
-      function addNewOwner(address _newOwner) public onlyOwner {
+
+    function addNewOwner(address _newOwner) public onlyOwner {
+        require(isOwner[_newOwner] == 0, "DAO: already an owner");
         isOwner[_newOwner] = 1;
         totalOwners++;
         emit NewOwnerAdded(msg.sender, _newOwner);
     }
 
-    function addProposal(string memory _proposalName, bytes memory _hash) public {
+    function addProposal(
+        string memory _proposalName, 
+        bytes memory _hash,
+        uint256 _maximumTarget,
+        uint256 _minimumTarget,
+        uint24 _duration
+        ) public {
         campaignManagers[msg.sender] = proposals.length;
-        proposals.push(Proposal(_proposalName, _hash, msg.sender, 0));
+        proposals.push(Proposal(
+            _proposalName, 
+            _hash, 
+            msg.sender, 
+            _maximumTarget, 
+            _minimumTarget, 
+            _duration, 
+            0));
         emit NewProposalCreated(msg.sender, (proposals.length-1));
     }
 
@@ -56,13 +76,21 @@ contract DAO{
         campaignVotes[_proposalId]++;
         emit VoteCasted(msg.sender, _proposalId, campaignVotes[_proposalId]);
         if( campaignVotes[_proposalId] > (totalOwners/2) ){
-            // deploy Campaign
-            // Campaign memory campaign = new Campaign()
-            // emit CampaignDeployed(campaign, _proposalId, proposals[_proposalId].manager)
+            proposals[_proposalId].isDeployed = 1;
+            Campaign campaign = new Campaign(
+                proposals[_proposalId].proposalName,
+                proposals[_proposalId].manager,
+                proposals[_proposalId].duration,
+                proposals[_proposalId].maximumTarget,
+                proposals[_proposalId].minimumTarget,
+                proposals[_proposalId].hash
+            );
+            emit CampaignDeployed(address(campaign), _proposalId, proposals[_proposalId].manager);
         }
     }
 
     function getProposals() public view returns(Proposal[] memory){
         return proposals;
     }
+
 }
